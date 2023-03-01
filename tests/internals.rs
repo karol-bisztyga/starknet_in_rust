@@ -1,13 +1,18 @@
 use felt::{felt_str, Felt};
 use lazy_static::lazy_static;
-use num_traits::Zero;
+use num_traits::{Num, Zero};
 use starknet_rs::{
     business_logic::{
+        execution::execution_entry_point::ExecutionEntryPoint,
         fact_state::{contract_state::ContractState, in_memory_state_reader::InMemoryStateReader},
         state::{cached_state::CachedState, state_api::StateReader},
+        transaction::objects::internal_invoke_function::InternalInvokeFunction,
     },
-    definitions::general_config::StarknetGeneralConfig,
-    services::api::contract_class::ContractClass,
+    definitions::{
+        constants::EXECUTE_ENTRY_POINT_SELECTOR, general_config::StarknetGeneralConfig,
+        transaction_type::TransactionType,
+    },
+    services::api::contract_class::{ContractClass, EntryPointType},
     starknet_storage::dict_storage::DictStorage,
     utils::{felt_to_hash, Address},
 };
@@ -153,4 +158,51 @@ fn test_create_account_tx_test_state() {
         contract_class,
         get_contract_class(ERC20_CONTRACT_PATH).unwrap()
     );
+}
+
+fn invoke_tx() -> InternalInvokeFunction {
+    // TODO Implement selector_from_name
+    let entry_point_selector = Felt::from_str_radix(
+        "1629174963900209270929724181518648239607275954724935556801269374828746872577",
+        10,
+    )
+    .unwrap();
+
+    let execute_call_data = vec![
+        TEST_CONTRACT_ADDRESS.clone().0,
+        entry_point_selector.clone(),
+        1.into(),
+        2.into(),
+    ];
+
+    InternalInvokeFunction::new(
+        TEST_ACCOUNT_CONTRACT_ADDRESS.clone(),
+        EXECUTE_ENTRY_POINT_SELECTOR.clone(),
+        EntryPointType::External, //TODO Check this
+        execute_call_data,
+        TransactionType::InvokeFunction,
+        1,
+        0.into(),
+        0.into(),
+        Vec::new(),
+        2,
+        0.into(),
+    )
+}
+
+#[test]
+fn test_invoke_tx() {
+    let (general_config, mut state) = create_account_tx_test_state().unwrap();
+
+    let mut invoke_tx = invoke_tx();
+
+    dbg!(&invoke_tx);
+    let calldata = invoke_tx.calldata.clone();
+    let sender_address = invoke_tx.contract_address.clone();
+
+    let result = invoke_tx._apply_specific_concurrent_changes(&mut state, &general_config);
+
+    dbg!(&result);
+
+    todo!()
 }
