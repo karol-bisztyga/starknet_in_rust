@@ -3,15 +3,11 @@ use lazy_static::lazy_static;
 use num_traits::{Num, Zero};
 use starknet_rs::{
     business_logic::{
-        execution::execution_entry_point::ExecutionEntryPoint,
         fact_state::{contract_state::ContractState, in_memory_state_reader::InMemoryStateReader},
         state::{cached_state::CachedState, state_api::StateReader},
         transaction::objects::internal_invoke_function::InternalInvokeFunction,
     },
-    definitions::{
-        constants::EXECUTE_ENTRY_POINT_SELECTOR, general_config::StarknetGeneralConfig,
-        transaction_type::TransactionType,
-    },
+    definitions::{general_config::StarknetGeneralConfig, transaction_type::TransactionType},
     services::api::contract_class::{ContractClass, EntryPointType},
     starknet_storage::dict_storage::DictStorage,
     utils::{felt_to_hash, Address},
@@ -19,7 +15,7 @@ use starknet_rs::{
 use std::{collections::HashMap, path::PathBuf};
 
 const ACCOUNT_CONTRACT_PATH: &str = "starknet_programs/account_without_validation.json";
-const ERC20_CONTRACT_PATH: &str = "starknet_programs/erc20_contract_without_some_syscalls.json";
+const ERC20_CONTRACT_PATH: &str = "starknet_programs/ERC20.json";
 const TEST_CONTRACT_PATH: &str = "starknet_programs/test_contract.json";
 
 lazy_static! {
@@ -52,7 +48,7 @@ where
 #[allow(dead_code)]
 fn create_account_tx_test_state(
 ) -> Result<(StarknetGeneralConfig, CachedState<InMemoryStateReader>), Box<dyn std::error::Error>> {
-    let general_config = StarknetGeneralConfig::default();
+    let general_config = StarknetGeneralConfig::new_for_testing();
 
     let test_contract_class_hash = TEST_CLASS_HASH.clone();
     let test_account_class_hash = TEST_ACCOUNT_CONTRACT_CLASS_HASH.clone();
@@ -132,8 +128,6 @@ fn create_account_tx_test_state(
 fn test_create_account_tx_test_state() {
     let (general_config, mut state) = create_account_tx_test_state().unwrap();
 
-    println!("{}", serde_json::to_string(&Felt::zero()).unwrap());
-
     let value = state
         .get_storage_at(&(
             general_config
@@ -143,17 +137,14 @@ fn test_create_account_tx_test_state() {
             felt_to_hash(&*TEST_ERC20_ACCOUNT_BALANCE_KEY),
         ))
         .unwrap();
-    println!("value = {:?}", value);
     assert_eq!(value, &2.into());
 
     let class_hash = state.get_class_hash_at(&*TEST_CONTRACT_ADDRESS).unwrap();
-    println!("value = {class_hash:?}");
     assert_eq!(class_hash, &felt_to_hash(&*TEST_CLASS_HASH));
 
     let contract_class = state
         .get_contract_class(&felt_to_hash(&*TEST_ERC20_CONTRACT_CLASS_HASH))
         .unwrap();
-    // println!("value = {contract_class:?}");
     assert_eq!(
         contract_class,
         get_contract_class(ERC20_CONTRACT_PATH).unwrap()
@@ -177,7 +168,7 @@ fn invoke_tx() -> InternalInvokeFunction {
 
     InternalInvokeFunction::new(
         TEST_ACCOUNT_CONTRACT_ADDRESS.clone(),
-        EXECUTE_ENTRY_POINT_SELECTOR.clone(),
+        0.into(),
         EntryPointType::External, //TODO Check this
         execute_call_data,
         TransactionType::InvokeFunction,
