@@ -546,6 +546,7 @@ where
     }
 
     fn _storage_write(&mut self, address: Address, value: Felt) -> Result<(), SyscallHandlerError> {
+        self._storage_read(address.clone())?;
         self.starknet_storage_state
             .write(&felt_to_hash(&address.0), value);
 
