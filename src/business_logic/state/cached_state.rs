@@ -20,7 +20,7 @@ pub const UNINITIALIZED_CLASS_HASH: &ClassHash = b"\x00\x00\x00\x00\x00\x00\x00\
 
 #[derive(Debug, Clone, Default, Eq, Getters, MutGetters, PartialEq)]
 pub struct CachedState<T: StateReader + Clone> {
-    #[get = "pub"]
+    #[getset(get = "pub", get_mut = "pub")]
     pub(crate) state_reader: T,
     #[getset(get = "pub", get_mut = "pub")]
     pub(crate) cache: StateCache,

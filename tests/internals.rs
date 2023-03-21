@@ -1227,3 +1227,41 @@ fn test_deploy_undeclared_account() {
         Err(TransactionError::State(StateError::MissingClassHash()))
     );
 }
+
+#[test]
+fn test_fibonacci_fee() {
+    let (starknet_general_config, state) = &mut create_account_tx_test_state().unwrap();
+
+    // Insert fibonacci contract
+    let fib_contract_address = Address(55.into());
+    let fib_class_hash: [u8; 32] = [6; 32];
+    let fib_contract_class = get_contract_class("starknet_programs/fibonacci.json").unwrap();
+    state
+        .set_contract_class(&fib_class_hash, &fib_contract_class)
+        .unwrap();
+    state
+        .state_reader_mut()
+        .address_to_class_hash_mut()
+        .insert(fib_contract_address.clone(), fib_class_hash);
+
+    let Address(test_contract_address) = TEST_CONTRACT_ADDRESS.clone();
+    let calldata = vec![
+        fib_contract_address.0,                            // CONTRACT_ADDRESS
+        Felt::from_bytes_be(&calculate_sn_keccak(b"fib")), // CONTRACT FUNCTION SELECTOR
+        Felt::from(3),                                     // CONTRACT_CALLDATA LEN
+        Felt::from(1),                                     // CONTRACT_CALLDATA
+        Felt::from(1),                                     // CONTRACT_CALLDATA
+        Felt::from(10),                                    // CONTRACT_CALLDATA
+    ];
+    let invoke_tx = invoke_tx(calldata);
+
+    // Extract invoke transaction fields for testing, as it is consumed when creating an account
+    // transaction.
+    let result = invoke_tx.execute(state, starknet_general_config).unwrap();
+
+    dbg!(result.call_info);
+
+    // let expected_execution_info = expected_transaction_execution_info();
+
+    // assert_eq!(result, expected_execution_info);
+}
