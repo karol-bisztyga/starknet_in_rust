@@ -1,13 +1,18 @@
 use super::state_errors::StateError;
-use cairo_rs::vm::errors::{
-    hint_errors::HintError, memory_errors::MemoryError, vm_errors::VirtualMachineError,
+use cairo_rs::{
+    types::errors::math_errors::MathError,
+    vm::errors::{
+        hint_errors::HintError, memory_errors::MemoryError, vm_errors::VirtualMachineError,
+    },
 };
 use thiserror::Error;
 
-#[derive(Debug, Error, PartialEq)]
+#[derive(Debug, Error)]
 pub enum SyscallHandlerError {
     #[error("Unknown syscall: {0}")]
     UnknownSyscall(String),
+    #[error("Couldn't execute syscall: {0}")]
+    ExecutionError(String),
     #[error("Couldn't convert Felt to usize")]
     FeltToUsizeFail,
     #[error("Couldn't convert Felt to u64")]
@@ -64,6 +69,8 @@ pub enum SyscallHandlerError {
     ErrorComputingHash,
     #[error(transparent)]
     State(#[from] StateError),
+    #[error(transparent)]
+    MathError(#[from] MathError),
     #[error(transparent)]
     Hint(#[from] HintError),
 }

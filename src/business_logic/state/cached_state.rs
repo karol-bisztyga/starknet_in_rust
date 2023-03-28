@@ -8,7 +8,7 @@ use crate::{
     starknet_storage::errors::storage_errors::StorageError,
     utils::{subtract_mappings, Address, ClassHash},
 };
-use felt::Felt;
+use felt::Felt252;
 use getset::{Getters, MutGetters};
 use num_traits::Zero;
 use std::collections::HashMap;
@@ -33,6 +33,18 @@ impl<T: StateReader + Clone> CachedState<T> {
         Self {
             cache: StateCache::default(),
             contract_classes: contract_class_cache,
+            state_reader,
+        }
+    }
+
+    pub fn new_for_testing(
+        state_reader: T,
+        contract_classes: Option<ContractClassCache>,
+        cache: StateCache,
+    ) -> Self {
+        Self {
+            cache,
+            contract_classes,
             state_reader,
         }
     }
@@ -97,7 +109,7 @@ impl<T: StateReader + Clone> StateReader for CachedState<T> {
             .ok_or_else(|| StateError::NoneClassHash(contract_address.clone()))
     }
 
-    fn get_nonce_at(&mut self, contract_address: &Address) -> Result<&Felt, StateError> {
+    fn get_nonce_at(&mut self, contract_address: &Address) -> Result<&Felt252, StateError> {
         if self.cache.get_nonce(contract_address).is_none() {
             let nonce = self.state_reader.get_nonce_at(contract_address)?;
             self.cache
@@ -109,7 +121,7 @@ impl<T: StateReader + Clone> StateReader for CachedState<T> {
             .ok_or_else(|| StateError::NoneNonce(contract_address.clone()))
     }
 
-    fn get_storage_at(&mut self, storage_entry: &StorageEntry) -> Result<&Felt, StateError> {
+    fn get_storage_at(&mut self, storage_entry: &StorageEntry) -> Result<&Felt252, StateError> {
         if self.cache.get_storage(storage_entry).is_none() {
             let value = match self.state_reader.get_storage_at(storage_entry) {
                 Ok(x) => x.clone(),
@@ -119,7 +131,7 @@ impl<T: StateReader + Clone> StateReader for CachedState<T> {
                     | StateError::NoneStoragLeaf(_)
                     | StateError::NoneStorage(_)
                     | StateError::NoneContractState(_),
-                ) => Felt::zero(),
+                ) => Felt252::zero(),
                 Err(e) => return Err(e),
             };
             self.cache
@@ -191,7 +203,7 @@ impl<T: StateReader + Clone> State for CachedState<T> {
         Ok(())
     }
 
-    fn set_storage_at(&mut self, storage_entry: &StorageEntry, value: Felt) {
+    fn set_storage_at(&mut self, storage_entry: &StorageEntry, value: Felt252) {
         self.cache
             .storage_writes
             .insert(storage_entry.clone(), value);
@@ -218,9 +230,9 @@ mod tests {
 
         let contract_address = Address(4242.into());
         let class_hash = [3; 32];
-        let nonce = Felt::new(47602);
+        let nonce = Felt252::new(47602);
         let storage_entry = (contract_address.clone(), [101; 32]);
-        let storage_value = Felt::new(1);
+        let storage_value = Felt252::new(1);
 
         state_reader
             .address_to_class_hash_mut()
@@ -242,7 +254,7 @@ mod tests {
         cached_state.increment_nonce(&contract_address).unwrap();
         assert_eq!(
             cached_state.get_nonce_at(&contract_address),
-            Ok(&(nonce + Felt::new(1)))
+            Ok(&(nonce + Felt252::new(1)))
         );
     }
 
@@ -293,7 +305,7 @@ mod tests {
         );
 
         let storage_entry: StorageEntry = (Address(31.into()), [0; 32]);
-        let value = Felt::new(10);
+        let value = Felt252::new(10);
         cached_state.set_storage_at(&storage_entry, value.clone());
 
         assert_eq!(cached_state.get_storage_at(&storage_entry), Ok(&value));
@@ -301,7 +313,7 @@ mod tests {
         let storage_entry_2: StorageEntry = (Address(150.into()), [1; 32]);
         assert_eq!(
             cached_state.get_storage_at(&storage_entry_2).unwrap(),
-            &Felt::zero(),
+            &Felt252::zero(),
         );
     }
 
@@ -334,7 +346,7 @@ mod tests {
 
         let contract_address = Address(31.into());
         let storage_key = [18; 32];
-        let value = Felt::new(912);
+        let value = Felt252::new(912);
 
         let mut cached_state = CachedState::new(state_reader, None);
 

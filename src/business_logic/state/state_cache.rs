@@ -2,12 +2,12 @@ use crate::{
     core::errors::state_errors::StateError,
     utils::{Address, ClassHash},
 };
-use felt::Felt;
+use felt::Felt252;
 use getset::{Getters, MutGetters};
 use std::collections::{HashMap, HashSet};
 
 /// (contract_address, key)
-// TODO: Change [u8; 32] to Felt.
+// TODO: Change [u8; 32] to Felt252.
 pub type StorageEntry = (Address, [u8; 32]);
 
 #[derive(Debug, Default, Clone, Eq, Getters, MutGetters, PartialEq)]
@@ -16,27 +16,27 @@ pub struct StateCache {
     #[get_mut = "pub"]
     pub(crate) class_hash_initial_values: HashMap<Address, ClassHash>,
     #[getset(get = "pub", get_mut = "pub")]
-    pub(crate) nonce_initial_values: HashMap<Address, Felt>,
+    pub(crate) nonce_initial_values: HashMap<Address, Felt252>,
     #[get_mut = "pub"]
-    pub(crate) storage_initial_values: HashMap<StorageEntry, Felt>,
+    pub(crate) storage_initial_values: HashMap<StorageEntry, Felt252>,
 
     // Writer's cached information.
     #[get_mut = "pub"]
     pub(crate) class_hash_writes: HashMap<Address, ClassHash>,
     #[get_mut = "pub"]
-    pub(crate) nonce_writes: HashMap<Address, Felt>,
+    pub(crate) nonce_writes: HashMap<Address, Felt252>,
     #[getset(get = "pub", get_mut = "pub")]
-    pub(crate) storage_writes: HashMap<StorageEntry, Felt>,
+    pub(crate) storage_writes: HashMap<StorageEntry, Felt252>,
 }
 
 impl StateCache {
     pub fn new(
         class_hash_initial_values: HashMap<Address, ClassHash>,
-        nonce_initial_values: HashMap<Address, Felt>,
-        storage_initial_values: HashMap<StorageEntry, Felt>,
+        nonce_initial_values: HashMap<Address, Felt252>,
+        storage_initial_values: HashMap<StorageEntry, Felt252>,
         class_hash_writes: HashMap<Address, ClassHash>,
-        nonce_writes: HashMap<Address, Felt>,
-        storage_writes: HashMap<StorageEntry, Felt>,
+        nonce_writes: HashMap<Address, Felt252>,
+        storage_writes: HashMap<StorageEntry, Felt252>,
     ) -> Self {
         Self {
             class_hash_initial_values,
@@ -59,6 +59,24 @@ impl StateCache {
         }
     }
 
+    pub fn new_for_testing(
+        class_hash_initial_values: HashMap<Address, [u8; 32]>,
+        nonce_initial_values: HashMap<Address, Felt252>,
+        storage_initial_values: HashMap<StorageEntry, Felt252>,
+        class_hash_writes: HashMap<Address, [u8; 32]>,
+        nonce_writes: HashMap<Address, Felt252>,
+        storage_writes: HashMap<(Address, [u8; 32]), Felt252>,
+    ) -> Self {
+        Self {
+            class_hash_initial_values,
+            nonce_initial_values,
+            storage_initial_values,
+            class_hash_writes,
+            nonce_writes,
+            storage_writes,
+        }
+    }
+
     pub(crate) fn get_class_hash(&self, contract_address: &Address) -> Option<&ClassHash> {
         if self.class_hash_writes.contains_key(contract_address) {
             return self.class_hash_writes.get(contract_address);
@@ -66,14 +84,14 @@ impl StateCache {
         self.class_hash_initial_values.get(contract_address)
     }
 
-    pub(crate) fn get_nonce(&self, contract_address: &Address) -> Option<&Felt> {
+    pub(crate) fn get_nonce(&self, contract_address: &Address) -> Option<&Felt252> {
         if self.nonce_writes.contains_key(contract_address) {
             return self.nonce_writes.get(contract_address);
         }
         self.nonce_initial_values.get(contract_address)
     }
 
-    pub(crate) fn get_storage(&self, storage_entry: &StorageEntry) -> Option<&Felt> {
+    pub(crate) fn get_storage(&self, storage_entry: &StorageEntry) -> Option<&Felt252> {
         if self.storage_writes.contains_key(storage_entry) {
             return self.storage_writes.get(storage_entry);
         }
@@ -90,19 +108,19 @@ impl StateCache {
     pub(crate) fn update_writes(
         &mut self,
         address_to_class_hash: &HashMap<Address, ClassHash>,
-        address_to_nonce: &HashMap<Address, Felt>,
-        storage_updates: &HashMap<StorageEntry, Felt>,
+        address_to_nonce: &HashMap<Address, Felt252>,
+        storage_updates: &HashMap<StorageEntry, Felt252>,
     ) {
         self.class_hash_writes.extend(address_to_class_hash.clone());
         self.nonce_writes.extend(address_to_nonce.clone());
         self.storage_writes.extend(storage_updates.clone());
     }
 
-    pub(crate) fn set_initial_values(
+    pub fn set_initial_values(
         &mut self,
         address_to_class_hash: &HashMap<Address, ClassHash>,
-        address_to_nonce: &HashMap<Address, Felt>,
-        storage_updates: &HashMap<StorageEntry, Felt>,
+        address_to_nonce: &HashMap<Address, Felt252>,
+        storage_updates: &HashMap<StorageEntry, Felt252>,
     ) -> Result<(), StateError> {
         if !(self.class_hash_initial_values.is_empty()
             && self.class_hash_writes.is_empty()

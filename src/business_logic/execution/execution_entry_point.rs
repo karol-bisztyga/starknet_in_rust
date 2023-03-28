@@ -20,7 +20,7 @@ use cairo_rs::{
         vm_core::VirtualMachine,
     },
 };
-use felt::Felt;
+use felt::Felt252;
 
 /// Represents a Cairo entry point execution of a StarkNet contract.
 #[derive(Debug)]
@@ -29,17 +29,17 @@ pub struct ExecutionEntryPoint {
     contract_address: Address,
     code_address: Option<Address>,
     class_hash: Option<[u8; 32]>,
-    calldata: Vec<Felt>,
+    calldata: Vec<Felt252>,
     caller_address: Address,
-    entry_point_selector: Felt,
+    entry_point_selector: Felt252,
     entry_point_type: EntryPointType,
 }
 
 impl ExecutionEntryPoint {
     pub fn new(
         contract_address: Address,
-        calldata: Vec<Felt>,
-        entry_point_selector: Felt,
+        calldata: Vec<Felt252>,
+        entry_point_selector: Felt252,
         caller_address: Address,
         entry_point_type: EntryPointType,
         call_type: Option<CallType>,
@@ -82,7 +82,7 @@ impl ExecutionEntryPoint {
 
         // Update resources usage (for bouncer).
         resources_manager.cairo_usage =
-            resources_manager.cairo_usage.clone() + runner.get_execution_resources()?;
+            &resources_manager.cairo_usage + &runner.get_execution_resources()?;
 
         let retdata = runner.get_return_values()?;
         self.build_call_info::<T>(
@@ -115,7 +115,7 @@ impl ExecutionEntryPoint {
             .map_err(|_| TransactionError::MissigContractClass)?;
 
         // fetch selected entry point
-        let entry_point = self.get_selected_entry_point(contract_class.clone(), class_hash)?;
+        let entry_point = self.get_selected_entry_point(&contract_class, class_hash)?;
         // create starknet runner
 
         let mut vm = VirtualMachine::new(false);
@@ -130,7 +130,7 @@ impl ExecutionEntryPoint {
         // prepare OS context
         let os_context = runner.prepare_os_context();
 
-        validate_contract_deployed(state, self.contract_address.clone())?;
+        validate_contract_deployed(state, &self.contract_address)?;
 
         // fetch syscall_ptr
         let initial_syscall_ptr: Relocatable = match os_context.get(0) {
@@ -172,11 +172,11 @@ impl ExecutionEntryPoint {
         runner.validate_and_process_os_context(os_context)?;
 
         // When execution starts the stack holds entry_points_args + [ret_fp, ret_pc].
-        let args_ptr = runner
+        let args_ptr = (runner
             .cairo_runner
             .get_initial_fp()
             .ok_or(TransactionError::MissingInitialFp)?
-            .sub_usize(entry_point_args.len() + 2)?;
+            - (entry_point_args.len() + 2))?;
 
         runner
             .vm
@@ -189,7 +189,7 @@ impl ExecutionEntryPoint {
     /// default if there is one and the requested one is not found.
     fn get_selected_entry_point(
         &self,
-        contract_class: ContractClass,
+        contract_class: &ContractClass,
         _class_hash: [u8; 32],
     ) -> Result<ContractEntryPoint, TransactionError> {
         let entry_points = contract_class
@@ -222,13 +222,13 @@ impl ExecutionEntryPoint {
         &self,
         previous_cairo_usage: ExecutionResources,
         syscall_handler: BusinessLogicSyscallHandler<S>,
-        retdata: Vec<Felt>,
+        retdata: Vec<Felt252>,
     ) -> Result<CallInfo, TransactionError>
     where
         S: State + StateReader,
     {
         let execution_resources =
-            syscall_handler.resources_manager.cairo_usage - previous_cairo_usage;
+            &syscall_handler.resources_manager.cairo_usage - &previous_cairo_usage;
 
         Ok(CallInfo {
             caller_address: self.caller_address.clone(),
@@ -273,6 +273,6 @@ impl ExecutionEntryPoint {
             }
         };
 
-        get_deployed_address_class_hash_at_address(state, code_address.unwrap())
+        get_deployed_address_class_hash_at_address(state, &code_address.unwrap())
     }
 }

@@ -28,7 +28,7 @@ use crate::{
     },
     utils::{Address, ClassHash},
 };
-use felt::Felt;
+use felt::Felt252;
 use num_traits::{One, Zero};
 use std::collections::HashMap;
 
@@ -78,7 +78,7 @@ impl StarknetState {
         let tx = InternalDeclare::new(
             contract_class,
             self.chain_id(),
-            Address(Felt::one()),
+            Address(Felt252::one()),
             0,
             0,
             Vec::new(),
@@ -97,11 +97,11 @@ impl StarknetState {
     pub fn invoke_raw(
         &mut self,
         contract_address: Address,
-        selector: Felt,
-        calldata: Vec<Felt>,
+        selector: Felt252,
+        calldata: Vec<Felt252>,
         max_fee: u64,
-        signature: Option<Vec<Felt>>,
-        nonce: Option<Felt>,
+        signature: Option<Vec<Felt252>>,
+        nonce: Option<Felt252>,
     ) -> Result<TransactionExecutionInfo, StarknetStateError> {
         let tx = self.create_invoke_function(
             contract_address,
@@ -123,8 +123,8 @@ impl StarknetState {
     pub fn execute_entry_point_raw(
         &mut self,
         contract_address: Address,
-        entry_point_selector: Felt,
-        calldata: Vec<Felt>,
+        entry_point_selector: Felt252,
+        calldata: Vec<Felt252>,
         caller_address: Address,
     ) -> Result<CallInfo, StarknetStateError> {
         let call = ExecutionEntryPoint::new(
@@ -165,7 +165,7 @@ impl StarknetState {
     pub fn deploy(
         &mut self,
         contract_class: ContractClass,
-        constructor_calldata: Vec<Felt>,
+        constructor_calldata: Vec<Felt252>,
         contract_address_salt: Address,
     ) -> Result<(Address, TransactionExecutionInfo), StarknetStateError> {
         let chain_id = self.general_config.starknet_os_config.chain_id.to_felt();
@@ -243,18 +243,18 @@ impl StarknetState {
     //    Private functions
     // ------------------------
 
-    fn chain_id(&self) -> Felt {
+    fn chain_id(&self) -> Felt252 {
         self.general_config.starknet_os_config.chain_id.to_felt()
     }
 
     fn create_invoke_function(
         &mut self,
         contract_address: Address,
-        entry_point_selector: Felt,
-        calldata: Vec<Felt>,
+        entry_point_selector: Felt252,
+        calldata: Vec<Felt252>,
         max_fee: u64,
-        signature: Option<Vec<Felt>>,
-        nonce: Option<Felt>,
+        signature: Option<Vec<Felt252>>,
+        nonce: Option<Felt252>,
     ) -> Result<InternalInvokeFunction, TransactionError> {
         let signature = match signature {
             Some(sign) => sign,
@@ -301,7 +301,6 @@ mod tests {
         let mut starknet_state = StarknetState::new(None);
         let path = PathBuf::from("starknet_programs/fibonacci.json");
         let contract_class = ContractClass::try_from(path).unwrap();
-        let constructor_calldata = [1.into(), 1.into(), 10.into()].to_vec();
         let contract_address_salt = Address(1.into());
 
         // expected results
@@ -311,7 +310,7 @@ mod tests {
         let class_hash = felt_to_hash(&hash);
 
         let address = Address(felt_str!(
-            "3173424428166065804253636112972198402746524727884605069568266184332607747575"
+            "2066790681318687707025847340457605657642478884993868155391041767964612021885"
         ));
 
         let mut actual_resources = HashMap::new();
@@ -339,11 +338,7 @@ mod tests {
         let exec = (address, transaction_exec_info);
         assert_eq!(
             starknet_state
-                .deploy(
-                    contract_class.clone(),
-                    constructor_calldata,
-                    contract_address_salt
-                )
+                .deploy(contract_class.clone(), vec![], contract_address_salt)
                 .unwrap(),
             exec
         );
@@ -380,9 +375,9 @@ mod tests {
         // this is not conceptually correct as the sender address would be an
         // Account contract (not the contract that we are currently declaring)
         // but for testing reasons its ok
-        let nonce = Felt::zero();
+        let nonce = Felt252::zero();
         let storage_entry: StorageEntry = (sender_address.clone(), [19; 32]);
-        let storage = Felt::zero();
+        let storage = Felt252::zero();
 
         let mut state_reader = InMemoryStateReader::default();
         state_reader
@@ -476,32 +471,35 @@ mod tests {
         let mut starknet_state = StarknetState::new(None);
         let path = PathBuf::from("starknet_programs/fibonacci.json");
         let contract_class = ContractClass::try_from(path).unwrap();
-        let constructor_calldata = [1.into(), 1.into(), 10.into()].to_vec();
+        let calldata = [1.into(), 1.into(), 10.into()].to_vec();
         let contract_address_salt = Address(1.into());
 
         let (contract_address, _exec_info) = starknet_state
-            .deploy(
-                contract_class.clone(),
-                constructor_calldata.clone(),
-                contract_address_salt,
-            )
+            .deploy(contract_class.clone(), vec![], contract_address_salt)
             .unwrap();
 
         // fibonacci selector
-        let selector = Felt::from_str_radix(
+        let selector = Felt252::from_str_radix(
             "112e35f48499939272000bd72eb840e502ca4c3aefa8800992e8defb746e0c9",
             16,
         )
         .unwrap();
 
+        // Statement **not** in blockifier.
+        starknet_state
+            .state
+            .cache_mut()
+            .nonce_initial_values_mut()
+            .insert(contract_address.clone(), Felt252::zero());
+
         let tx_info = starknet_state
             .invoke_raw(
                 contract_address,
                 selector.clone(),
-                constructor_calldata,
+                calldata,
                 0,
                 Some(Vec::new()),
-                Some(Felt::zero()),
+                Some(Felt252::zero()),
             )
             .unwrap();
 
@@ -511,15 +509,18 @@ mod tests {
         let fib_class_hash = felt_to_hash(&hash);
 
         let address = felt_str!(
-            "3173424428166065804253636112972198402746524727884605069568266184332607747575"
+            "2066790681318687707025847340457605657642478884993868155391041767964612021885"
         );
-        let mut actual_resources = HashMap::new();
-        actual_resources.insert("l1_gas_usage".to_string(), 0);
+        let actual_resources = HashMap::from([
+            ("l1_gas_usage".to_string(), 0),
+            ("range_check_builtin".to_string(), 70),
+            ("pedersen_builtin".to_string(), 16),
+        ]);
 
         let expected_info = TransactionExecutionInfo {
             validate_info: None,
             call_info: Some(CallInfo {
-                caller_address: Address(Felt::zero()),
+                caller_address: Address(Felt252::zero()),
                 call_type: Some(CallType::Call),
                 contract_address: Address(address),
                 code_address: None,
@@ -535,6 +536,6 @@ mod tests {
             ..Default::default()
         };
 
-        assert_eq!(expected_info, tx_info);
+        assert_eq!(tx_info, expected_info);
     }
 }

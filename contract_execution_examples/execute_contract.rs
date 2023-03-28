@@ -1,6 +1,6 @@
 #![deny(warnings)]
 
-use felt::Felt;
+use felt::Felt252;
 use starknet_rs::{
     business_logic::{
         execution::{
@@ -26,8 +26,8 @@ use std::path::Path;
 fn test_contract(
     contract_path: impl AsRef<Path>,
     entry_point: &str,
-    call_data: Vec<Felt>,
-    return_data: impl Into<Vec<Felt>>,
+    call_data: Vec<Felt252>,
+    return_data: impl Into<Vec<Felt252>>,
 ) {
     let contract_class = ContractClass::try_from(contract_path.as_ref().to_path_buf())
         .expect("Could not load contract from JSON");
@@ -64,17 +64,17 @@ fn test_contract(
 
     let contract_state = ContractState::new(
         class_hash,
-        tx_execution_context.nonce().clone(),
+        tx_execution_context.nonce(),
         Default::default(),
     );
     let mut state_reader = InMemoryStateReader::new(DictStorage::new(), DictStorage::new());
     state_reader
         .contract_states_mut()
-        .insert(contract_address.clone(), contract_state);
+        .insert(contract_address, contract_state);
 
     let mut state = CachedState::new(
         state_reader,
-        Some([(class_hash, contract_class)].into_iter().collect()),
+        Some([(class_hash, contract_class)].iter().collect()),
     );
 
     //* ------------------------------------
@@ -83,12 +83,12 @@ fn test_contract(
 
     let caller_address = Address(0.into());
 
-    let entry_point_selector = Felt::from_bytes_be(&calculate_sn_keccak(entry_point.as_bytes()));
+    let entry_point_selector = Felt252::from_bytes_be(&calculate_sn_keccak(entry_point.as_bytes()));
     let entry_point = ExecutionEntryPoint::new(
-        contract_address.clone(),
-        call_data.clone(),
-        entry_point_selector.clone(),
-        caller_address.clone(),
+        contract_address,
+        call_data,
+        entry_point_selector,
+        caller_address,
         EntryPointType::External,
         CallType::Delegate.into(),
         class_hash.into(),
