@@ -25,6 +25,8 @@ thiserror = "1.0.32"
 clap = { version = "4.1.8", features = ["derive"] }
 actix-web = "4.3.1"
 awc = "3.1.1"
+cairo-lang-starknet = { git = "https://github.com/starkware-libs/cairo" }
+cairo-lang-casm = { git = "https://github.com/starkware-libs/cairo" }
 mimalloc = { version = "0.1.29", default-features = false, optional = true }
 hex = "0.4.3"
 cargo-llvm-cov = "0.5.14"
@@ -37,7 +39,7 @@ rusty-hook = "0.11"
 coverage-helper = "0.1.0"
 
 [workspace]
-members = ["crates/starknet-rs-py", "crates/starknet-contract-class", "fuzzer"]
+members = ["crates/starknet-rs-py", "crates/cairo-1-hint-processor", "crates/starknet-contract-class", "fuzzer"]
 
 [[bench]]
 path = "bench/internals.rs"
